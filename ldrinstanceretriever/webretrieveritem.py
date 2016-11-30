@@ -23,16 +23,21 @@ class WebRetrieverItem(RetrieverItem):
     builds the file paths for the premis record in livePremis and the content and technical
     metadata in longTermStorage
     """
-    def __init__(self, arkid, objid):
+    def __init__(self, arkid, objid, whitelist=True):
         """the initialization method for the AnInstanceItem class
 
         __Args__
         1. arkid (str): a string nice opaque universal identifier for a particular accession that
                         contains premis record objects
         2. objid (str): a string unique universal identifier for a particular premis record object
+
+        __KWARgs__
+        1. whitelist (Boolean):  a flag for whether or not to determine of the content is authorized to be distributed publicly
         """
         self.arkid = arkid
         self.objid = objid
+
+        self.whitelist = "/disk/0/repositoryCode/apistorage/publicurls/whitelist.txt"
         self.content_root = "/data/repository/longTermStorage"
         self.premis_root = "/data/repository/livePremis"
         self.premisid_path = identifier_to_path(objid)
@@ -48,10 +53,13 @@ class WebRetrieverItem(RetrieverItem):
                                       str(identifier_to_path(objid)),
                                       "arf", "content.file")
         self.premis_core_data = extract_identity_data_from_premis_record(self.premis_file_path)
-        print(self.premis_core_data)
         self.mimetype = self.premis_core_data.mimetype
-        print(self.mimetype)
         self.extension = self.mimetype.split('/')[1]
+        if whitelist:
+            if self.get_identifier() in open(self.whitelist, "r").readlines():
+                self.public = True
+        else:
+            self.public = False
 
     def get_file_data(self):
         """a method that uses the content_file_path property and the mimetype property to return a
@@ -59,13 +67,16 @@ class WebRetrieverItem(RetrieverItem):
         """
         data = send_file(self.content_file_path, as_attachment=True, attachment_filename=self.objid+self.extension,
                          mimetype=self.mimetype)
-        return data
+        return (self.content_file_path, self.get_identifier().split('/')[1], self.mimetype)
+
+    def get_public_data(self):
+        pass
 
     def get_premis_data(self):
         """a method that uses the premis_file_path property to return a web response downloadable
         file of the main content of an LDR material suite.
         """
-        return send_file(self.premis_file_path, mimetype="application/xml")
+        return (self.premis_file_path, self.get_identifier.split('/')[1], "application/xml"))
 
     def find_out_related_objects(self):
         """a method that uses the premis_core_data property to return a dictionary containing RESTful
@@ -74,7 +85,8 @@ class WebRetrieverItem(RetrieverItem):
         output = {}
         tally = 0
         for n_related_object in self.premis_core_data.related_objects:
-           output[tally] = {'loc': "/" + self.premis_core_data.related_objects[i] + "/presforms/" + str(i)}
+           output[tally] = {'loc': self.premis_core_data.related_objects[i],
+                            'identifier': str(i)}
         return output
 
     def find_out_technical_metadata(self):
@@ -91,6 +103,15 @@ class WebRetrieverItem(RetrieverItem):
         output = {}
         for i in range(len(metadata_in_content_directory)):
             output[str(i)] = {"label": metadata_in_content_directory[i].split('.xml')[0],
-                              "loc":"/" + self.arkid + "/" + self.objid + "/techmds/" + str(i)}
+                              "loc": self.get_identifier(),
+                              "identifier": str(i)}
         return output
 
+    def get_premis_record_object(self):
+        return self.premis_core_data.premis_record
+
+    def get_identifier(self):
+        return join(self.arkid, self.objid)
+
+    def is_it_public(self):
+        return self.public
