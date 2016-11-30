@@ -1,7 +1,7 @@
 
 from abc import ABCMeta, abstractmethod
 
-class Retriever(metaclass=ABCMeta):
+class RetrieverItem(metaclass=ABCMeta):
     @abstractmethod
     def get_file_data():
         """a method that uses the content_file_path property and the mimetype property to return a
